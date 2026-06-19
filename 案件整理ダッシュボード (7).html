@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案件整理ダッシュボード</title>
+<style>
+  :root{
+    --navy:#1f3a5f; --navy-light:#2e5c8a; --accent:#3b8ea5;
+    --bg:#f4f6f8; --card:#ffffff; --border:#dde3e8;
+    --text:#2c3338; --text-soft:#6b7480; --done:#9aa6b2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{font-family:"Hiragino Sans","Yu Gothic UI","Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+
+  header{
+    background:var(--navy);color:#fff;padding:12px 16px;
+    display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    position:sticky;top:0;z-index:10;
+  }
+  header h1{font-size:17px;margin:0;font-weight:700;white-space:nowrap;}
+  .phase-selector{display:flex;flex-wrap:wrap;gap:5px;flex:1;}
+  .phase-btn{
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);
+    color:#fff;font-size:12px;padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;
+    transition:background .15s;
+  }
+  .phase-btn:hover{background:rgba(255,255,255,0.18);}
+  .phase-btn.active{background:var(--accent);border-color:var(--accent);font-weight:700;}
+  .reset-btn{background:#e3664a;border:none;color:#fff;font-size:13px;font-weight:700;padding:7px 13px;border-radius:6px;cursor:pointer;white-space:nowrap;}
+  .reset-btn:hover{background:#cf5236;}
+
+  main{display:flex;gap:14px;padding:16px;max-width:1400px;width:100%;margin:0 auto;align-items:flex-start;}
+  .left{flex:3;min-width:0;display:flex;flex-direction:column;gap:12px;}
+  .side-panel{flex:1.3;min-width:270px;display:flex;flex-direction:column;gap:12px;position:sticky;top:72px;}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .card-title{
+    font-size:13px;font-weight:700;color:var(--navy-light);margin:0 0 2px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .badge{font-size:11px;background:var(--accent);color:#fff;border-radius:10px;padding:1px 8px;font-weight:700;}
+  .progress-track{height:4px;background:var(--border);border-radius:3px;margin:6px 0 10px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent);width:0%;transition:width .2s;}
+
+  ul.cl{list-style:none;margin:0;padding:0;}
+  ul.cl ul.cl{padding-left:20px;margin-top:2px;}
+  .ci{display:flex;align-items:flex-start;gap:7px;padding:3px 4px;border-radius:5px;cursor:pointer;font-size:13px;}
+  .ci:hover{background:#eef2f6;}
+  .ci .box{flex:none;width:15px;height:15px;margin-top:3px;border:2px solid #b9c2cb;border-radius:3px;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
+  .ci.checked .box{background:var(--accent);border-color:var(--accent);}
+  .ci .box svg{display:none;width:9px;height:9px;}
+  .ci.checked .box svg{display:block;}
+  .ci .lbl{flex:1;}
+  .ci.checked .lbl{color:var(--done);text-decoration:line-through;}
+
+  /* choice / yesno */
+  .choice-item{padding:4px 4px 6px;}
+  .choice-label{font-size:13px;margin-bottom:5px;font-weight:600;color:var(--navy);}
+  .choice-btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
+  .c-btn{border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 13px;font-size:12.5px;cursor:pointer;color:var(--text-soft);font-weight:700;transition:background .15s;}
+  .c-btn:hover{background:#eef2f6;}
+  .c-btn.active{background:var(--navy-light);color:#fff;border-color:var(--navy-light);}
+  .c-btn.yes-btn.active{background:var(--accent);border-color:var(--accent);}
+  .c-btn.no-btn.active{background:#e3664a;border-color:#e3664a;}
+  .choice-body{display:none;padding-left:4px;margin-top:4px;}
+  .choice-body.open{display:block;}
+  .yn-note{font-size:12px;background:#f1f5f8;border-left:3px solid var(--accent);padding:6px 8px;border-radius:0 6px 6px 0;color:var(--text);display:none;margin-top:4px;}
+
+  .note{font-size:12px;color:var(--text-soft);background:#f1f5f8;border-left:3px solid var(--accent);padding:7px 9px;border-radius:0 6px 6px 0;margin-top:8px;}
+
+  /* tabs */
+  .tabs{display:flex;gap:5px;}
+  .tab-btn{flex:1;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 5px;font-size:12px;font-weight:700;color:var(--text-soft);cursor:pointer;}
+  .tab-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+
+  .phase-def-panel{
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    font-size:12px;
+  }
+  .phase-def-section{margin-bottom:14px;}
+  .phase-def-title{
+    font-size:12.5px;font-weight:700;color:var(--navy-light);
+    padding:5px 8px;background:#eef2f6;border-radius:5px;margin-bottom:4px;cursor:pointer;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .phase-def-title:hover{background:#dde8f0;}
+  .phase-def-title.active-phase{background:var(--accent);color:#fff;}
+  .phase-def-choice{
+    font-size:11.5px;font-weight:700;color:var(--accent);
+    margin:4px 0 2px;
+  }
+  .phase-def-opt{
+    font-size:11.5px;color:var(--text-soft);padding:1px 4px 1px 12px;
+  }
+
+  table.ref{width:100%;border-collapse:collapse;font-size:12px;}
+  table.ref th,table.ref td{border:1px solid var(--border);padding:5px 7px;text-align:left;vertical-align:top;}
+  table.ref th{background:#eef2f6;color:var(--navy);font-weight:700;font-size:11px;}
+
+  @media(max-width:900px){main{flex-direction:column;}.side-panel{position:static;width:100%;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>案件整理チェックリスト</h1>
+  <div class="phase-selector" id="phaseSelector"></div>
+  <button class="reset-btn" id="nextCase">次の案件へ ↻</button>
+</header>
+
+<main>
+  <div class="left">
+
+    <!-- ① フェーズ確認 -->
+    <div class="card">
+      <div class="card-title">① フェーズの確認（マネージャー） <span class="badge" id="p1prog">0/0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="p1fill"></div></div>
+      <ul class="cl" id="p1list"></ul>
+    </div>
+
+    <!-- ② フェーズ別確認事項 -->
+    <div class="card">
+      <div class="card-title">② フェーズ別確認事項 <span id="phaseName" style="color:var(--accent);font-size:12px;"></span> <span class="badge" id="p2prog">0/0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="p2fill"></div></div>
+      <div id="phaseBody"></div>
+    </div>
+
+    <!-- ③ KV更新状況 -->
+    <div class="card">
+      <div class="card-title">③ RAM案件の場合：KV更新状況（マネージャー） <span class="badge" id="p3prog">0/0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="p3fill"></div></div>
+      <ul class="cl" id="p3list"></ul>
+    </div>
+
+    <!-- ④ 完了予定日 -->
+    <div class="card">
+      <div class="card-title">④ 案件の完了予定日の確認（マネージャー） <span class="badge" id="p4prog">0/0</span></div>
+      <div class="progress-track"><div class="progress-fill" id="p4fill"></div></div>
+      <ul class="cl" id="p4list"></ul>
+    </div>
+
+  </div>
+
+  <aside class="side-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="phasedef">フェーズ定義</button>
+      <button class="tab-btn" data-tab="reminder">催促</button>
+      <button class="tab-btn" data-tab="trans">移行条件</button>
+    </div>
+    <div class="card tab-content active" data-tab="phasedef" style="padding:12px;">
+      <div class="card-title" style="margin-bottom:8px;">フェーズ別確認事項 一覧</div>
+      <div class="phase-def-panel" id="phaseDefPanel"></div>
+    </div>
+    <div class="card tab-content" data-tab="reminder">
+      <div class="card-title">催促ルール一覧</div>
+      <table class="ref" id="reminderTable"></table>
+    </div>
+    <div class="card tab-content" data-tab="trans">
+      <div class="card-title">フェーズ移行条件</div>
+      <table class="ref" id="transTable"></table>
+    </div>
+  </aside>
+</main>
+
+<script>
+/* ======== SVG ======== */
+const CHK = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 12L13 4" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/* ======== STATE ======== */
+let state = {};
+let yesnoData = {};
+let idCnt = 0;
+let p1Ids=[], p2Ids=[], p3Ids=[], p4Ids=[];
+
+function nid(){ return 'i'+(idCnt++); }
+
+/* ======== DATA ======== */
+
+const P1_ITEMS = [
+  "現在のフェーズは「〜」で合ってますか？"
+];
+
+const P3_ITEMS = [
+  "KVの更新状況をチェック"
+];
+
+const P4_ITEMS = [
+  "完了予定日が正しく入っているか、完了予定日の目標はいつにするか"
+];
+
+const PHASES = {
+  1:{
+    title:"①相談中・正式依頼待ち",
+    items:[
+      "いつ・誰からの依頼ですね。どんな依頼ですか？原因箇所・被害箇所わかる範囲で埋まってるかな",
+      {type:"choice", text:"今は誰にボールがありますか？", options:[
+        {label:"TJボール", items:["いつボール返せそうですか？"]},
+        {label:"相手ボール", items:["いつ再度意向確認しますか？"]},
+      ]},
+    ]
+  },
+  2:{
+    title:"②調査調整中",
+    items:[
+      "いつ・誰からの依頼ですね。原因箇所・被害箇所わかる範囲で埋まってるかな",
+      "現在の漏水状況は？",
+      "加害側の利用制限などはないですか？",
+      "調査欄確認します。欄がなければ作成しましょう。業者が決まってれば調査会社入力しましょう",
+      "調査費について建物管理へ組合側での負担可否確認してますか？",
+      "原因不明の調査費であれば「原因調査費」の保険特約があれば事前に打診すれば負担いただけることがあるので確認してください",
+      {type:"choice", text:"日程調整は自分でやってますか？サブ担に依頼してますか？", options:[
+        {label:"自分でやってる", items:["余裕がない限りは、基本サブ担に依頼しましょう"]},
+        {label:"サブ担に依頼してる", items:[]},
+      ]},
+      {type:"choice", text:"日程調整開始してから3日以上かかってないですか？", options:[
+        {label:"3日以内", items:[]},
+        {label:"3日以上かかってる", items:[
+          "その理由をヒアリング",
+          "連絡手段・頻度を確認（電話のみ／SMSのみなど単一手段になっていないか）",
+          "複数手段で毎日連絡しても取れない場合 → 管理会社経由の連絡依頼、RAM物件は緊急連絡先の開示依頼など連絡手段を切替",
+          "毎日連絡できていない場合 → 営業担当へ「平日毎日連絡」を指示。必要に応じてサブ担当へも依頼",
+        ]},
+      ]},
+    ]
+  },
+  3:{
+    title:"③調査中",
+    items:[
+      "いつ・誰からの依頼ですね。原因箇所・被害箇所わかる範囲で埋まってるかな",
+      "現在の漏水状況は？",
+      "加害側の利用制限などはないですか？",
+      {type:"choice", text:"調査欄確認します。調査のフェーズはどこかな？", options:[
+        {label:"調査待ち", items:[
+          "調査会社、調査日時は入力できてる？",
+          "（登場人物欄確認）登場人物全員に確定連絡済んでる？",
+        ]},
+        {label:"調査完了・調査当日", items:[
+          "明日報告書確認してワークフローあげてください",
+        ]},
+        {label:"調査完了・翌日", items:[
+          "報告書と見積書届いた？",
+          "見積書来てる場合、業者金額入ってる？",
+          "調査完了ワークフローまだだったら今日中に上げてね",
+        ]},
+        {label:"調査完了・翌日以降", items:[
+          "報告書共有日入力されてる？",
+          "業者金額とTJ金額入ってる？",
+          "調査費見積書は送付済み？精算先決まってる？精算方法と精算者のSF入力内容合ってる？",
+          "原因修繕や被害復旧は必要そう？提案予定なくても必要工事がある場合は工事欄作っておこう",
+          "TJから原因工事提案する？する場合の今の進捗は？（業者ボール？自分ボール？池田さんボール？）",
+          "被害復旧の意向は確認できてる？まだだったら今のうちに被害管理に意向確認しましょう。TJで被害復旧取れてるなら加害側への事故受付案内もしましょう。保険の欄も作っておこう。",
+        ]},
+      ]},
+    ]
+  },
+  4:{
+    title:"④修繕提案中",
+    items:[
+      "いつ・誰からの依頼ですね。原因箇所・被害箇所わかる範囲で埋まってるかな",
+      "現在の漏水状況は？",
+      "加害側の利用制限などはないですか？",
+      "調査欄確認します",
+      "調査費は精算に向けて進められてる？",
+      {type:"choice", text:"原因工事欄確認します。フェーズは提案中？日程調整中？", options:[
+        {label:"提案中", items:[
+          "提案中であることは関係各所に伝えられてる？",
+          "工事会社入力できてる？業者金額とTJ金額と精算者入力できてる？",
+          "工事提案したのはいつ頃？返事がないなら再度意向の確認しましょう（漏水継続中：2-3日に1回、一時的に止まってる：1週間に1回、必須ではない工事：月に1回が目安）",
+          "時間かかってる場合、入居者や被害管理には進捗あってもなくても定期的に連絡できてる？",
+        ]},
+        {label:"発注あり・日程調整中", items:[
+          "日程調整中であること関係各所に伝えられてる？",
+          "日程調整は自分？サブ担？（余裕がない限りは基本サブ担に依頼しましょう）",
+          "日程調整開始してから1〜2週間以上かかってないですか？",
+          "1〜2週間以上かかっている場合はその理由ヒアリング（連絡手段・頻度を確認。複数手段で毎日連絡しても取れない場合→管理会社経由の連絡依頼、RAM物件は緊急連絡先の開示依頼。毎日連絡できていない場合→平日毎日連絡を指示）",
+        ]},
+        {label:"発注あり・日程調整未着手", items:[
+          "理由を確認（部材の納期待ち？等）",
+        ]},
+      ]},
+      "被害復旧は必要そう？提案予定なくても必要工事がある場合は工事欄作っておこう",
+      "被害復旧の意向は確認できてる？まだだったら今のうちに被害管理に意向確認しましょう。TJで被害復旧取れてるなら加害側への事故受付案内もしましょう。保険の欄も作っておこう。",
+    ]
+  },
+  5:{
+    title:"⑤修繕待ち",
+    items:[
+      "いつ・誰からの依頼ですね。原因箇所・被害箇所わかる範囲で埋まってるかな",
+      "現在の漏水状況は？",
+      "加害側の利用制限などはないですか？",
+      "調査欄確認します",
+      "調査費は精算に向けて進められてる？",
+      {type:"choice", text:"原因工事欄確認します。工事待ち？工事完了の直後？", options:[
+        {label:"工事待ち", items:[
+          "関係各所に確定連絡できてる？",
+          "工事開始日と完了日入力できてる？",
+          "工事会社入力できてる？業者金額とTJ金額と精算者入力できてる？",
+          "工事完了後は何をする予定？（被害復旧の方針確認？保険申請？精算完了したらクローズ？）",
+          "被害復旧の意向確認ができてないのであれば今のうちに確認取っておきましょう",
+        ]},
+        {label:"工事完了直後", items:[
+          "完了報告書関係各所に送ったら報告書共有日入れましょう",
+          "今から何する予定？（被害復旧の方針確認？保険申請？精算完了したらクローズ？）",
+        ]},
+      ]},
+    ]
+  },
+  6:{
+    title:"⑥方針確認中",
+    items:[
+      "いつ・誰からの依頼ですね。原因箇所・被害箇所わかる範囲で埋まってるかな",
+      "何についての方針確認中？（例：他社で原因修繕中でその結果待ち、被害復旧費用の捻出先を検討中など）",
+      "長期間止まっている場合 → 対応方針の変更など、案件を前進させるためのアクションをアドバイス",
+      "関係各所（管理会社・オーナー・被害側等）への定期連絡ができているか（放置しがちなフェーズのため重点確認）",
+    ]
+  },
+  7:{
+    title:"⑦保険申請中",
+    items:[
+      "いつ・誰からの依頼ですね。漏水状況と利用制限の欄更新できてる？原因箇所・被害箇所わかる範囲で埋まってるかな？",
+      {type:"choice", text:"被害復旧工事はこれから？それとも完了してる？", options:[
+        {label:"これから", items:[
+          "加害管理（オーナー）と被害管理（オーナー）/被害入居者は今後の流れを理解できてる？できてなければ説明するよう指示",
+        ]},
+        {label:"完了してる", items:[]},
+      ]},
+      "調査欄確認します",
+      "調査費は精算に向けて進められてる？",
+      "工事欄確認します",
+      "原因工事は精算に向けて進められてる？",
+      "被害復旧工事欄できてる？埋めれるとこ埋まってる？",
+      "保険欄確認します。わかってる情報一通り入ってる？",
+      {type:"choice", text:"保険申請に向けて現在何をしている状況？", options:[
+        {label:"事故受付待ち", items:[]},
+        {label:"保険会社からの連絡待ち", items:[]},
+        {label:"書類提出準備中", items:[
+          "保険申請用TJ見積が完成している場合 → 見積内容の確認（ホテル泊・荷物移動費等の抜け漏れチェック）、保険欄の申請金額が入力できてるか",
+        ]},
+        {label:"書類準備に向けた現調中", items:[
+          "再現調の手配状況確認",
+        ]},
+      ]},
+    ]
+  },
+  8:{
+    title:"⑧保険審査中",
+    items:[
+      "いつ・誰からの依頼ですね。漏水状況と利用制限の欄更新できてる？原因箇所・被害箇所わかる範囲で埋まってるかな？",
+      {type:"choice", text:"今は審査結果待ち？結果受領済み？査定表内容に承諾し受領に向けて進んでいる？", options:[
+        {label:"審査結果待ち", items:[
+          "申請内容の確認",
+          "関係各所へ「審査中であること」「今後の流れ」を説明できているか（進展がなくても月1回は連絡）",
+          "1ヵ月以上経過している場合 → 保険会社へ進捗確認できているか",
+        ]},
+        {label:"審査結果受領済み", items:[
+          "査定表を受領しているか／受領している場合、内容確認",
+          {type:"yesno", text:"認定金額内で施工可能か",
+            yes:"→ 双方への意思確認へ進む（保険金受領に進む前に、被害側・加害側双方へ「この内容で工事を進めてよいか」の意思確認を行うよう声がけ。双方OKが出てから受領へ進む）",
+            no:"→ 安価な業者への変更を検討。変更の余地がない／変更しても難しい場合は工事内容の削減・調整が必要。職人へ「工事を削るならどこか」相談し、その見解を元に被害側へ工事内容削減を相談（美観・機能に影響なく、円滑な進行のための調整であることを伝える）"
+          },
+        ]},
+        {label:"承諾済み・受領に向けて進行中", items:[
+          "当事者へ結果・工事内容を説明できているか",
+          "保険金受取口座は弊社になっているか",
+          "必要書類の取り付け進捗",
+          "工事欄に入金予定日が入っているか（具体的日付不明の場合は2ヵ月後の日付を仮入力）",
+        ]},
+      ]},
+    ],
+    note:"目安：審査開始後2週間〜1ヵ月で結果が出る"
+  },
+  9:{
+    title:"⑨精算中",
+    items:[
+      "何についての精算中か（原因工事費／保険金／調査費など）",
+      "調査・工事欄の確認（入金予定日が入っているか、依頼元手数料がある場合は金額が入っているか）",
+      "精算完了後の予定（クローズ予定か、被害復旧工事に進む予定か）",
+      "入金遅延が発生していないか",
+      "遅延あり、かつ30万円を超える場合 → 池田さんへ報告できているか",
+      "精算が難航している場合 → アドバイス",
+    ]
+  },
+  10:{
+    title:"⑩被害復旧工事中",
+    items:[
+      "いつ・誰からの依頼ですね。漏水状況と利用制限の欄更新できてる？原因箇所・被害箇所わかる範囲で埋まってるかな？",
+      {type:"choice", text:"今は何をしてる最中？", options:[
+        {label:"現調手配中", items:[
+          "工事欄確認します。誰がいつ現調に行くか入力できてる？",
+          "日程調整は自分かサブ担当か",
+          "業者への現調依頼範囲を指示できているか（被害箇所が不明なまま「見てきて」になっていないか）",
+          "関係各所にこの進捗伝えられてる？",
+        ]},
+        {label:"見積作成中", items:[
+          "工事欄確認します。埋められるところ埋まってる？",
+          "今回実費用か保険申請用か",
+          "ボールは自分か池田さんか",
+          "池田さんボールの場合は見積内容を確認",
+        ]},
+        {label:"実費提案中", items:[
+          "いつ誰に提案し、現在どういう状況？",
+          "提案状況について被害側に報告できてる？",
+          "実費＝保険会社を通さず示談に進むため、加害・被害双方が内容に納得したことを確認してから先へ進むよう声がけ",
+        ]},
+        {label:"日程調整中", items:[
+          "工事欄埋められるところ埋まってる？",
+          "工事内容（工期・注意点）",
+          "工期3日超または音が出る場合の張り紙準備状況",
+          "調整担当者は自分？サブ担？",
+          "調整開始からの経過期間（2週間以上 → 時間がかかっている理由を確認し、対応策を検討）",
+        ]},
+        {label:"工事待ち", items:[
+          "日程確定連絡できているか",
+          "工事範囲・内容の説明ができているか",
+          "荷物移動・ホテル移動の手配に漏れがないか（工事範囲に荷物が残っている、ホテル泊日数の誤り等）",
+          "荷物移動・ホテル移動がある場合、その他欄に該当欄を作成できているか",
+          "3日以上の工事の場合、張り紙手配ができているか",
+          "実費精算予定の場合 → 費用回収に問題なさそうか／個人取引の場合は契約書を巻くべきか（金額・取引履歴次第。過去に遅延や連絡困難があった相手は必ず契約書を巻く）",
+          "保険精算の場合 → 保険金が入金済みか、または目処が立っているか",
+        ]},
+      ]},
+    ]
+  },
+  11:{
+    title:"⑪クローズ済み",
+    items:[
+      "特になし（最終確認項目は今後整理予定）",
+    ]
+  },
+};
+
+const PHASE_DEFS = {
+  1:["依頼元から漏水の相談を受けているが、正式な調査依頼がまだ確定していないとき"],
+  2:["弊社への調査依頼が確定しており、調査日時がまだ確定していないとき"],
+  3:[
+    "調査の日程が確定しており、調査待ちのとき",
+    "調査が完了しており、報告書の送付や修繕提案の準備段階のとき",
+  ],
+  4:[
+    "原因修繕の工事提案を行っており、相手の発注回答待ちのとき",
+    "発注が確定し、原因修繕工事の日程調整を進めているとき",
+  ],
+  5:[
+    "原因修繕工事の日程が確定し、着工を待っているとき",
+    "原因修繕工事が完了し、次のアクション（被害復旧・保険申請・クローズ等）に向けて準備しているとき",
+  ],
+  6:["原因修繕が完了または他社対応中で、被害復旧の方針（誰が・どの保険で・どう進めるか）がまだ決まっていないとき"],
+  7:["被害復旧工事の費用を保険で賄う方針が決まっており、保険会社への申請手続きを進めているとき"],
+  8:[
+    "保険申請が完了し、保険会社の審査結果を待っているとき",
+    "審査結果を受け、査定内容の確認・双方の意思確認を進めているとき",
+  ],
+  9:["工事費・調査費・保険金など、金銭の授受・精算手続きを進めているとき"],
+  10:["被害復旧工事の手配・日程調整・施工を進めているとき"],
+  11:["すべての対応・精算が完了し、案件を終了したとき"],
+};
+
+const REMINDER_ROWS = [
+  ["①相談中","TJボール","ー","即時回答が必要。回答内容を指示"],
+  ["①相談中","相手ボール・1週間反応なし","1週間","営業担当が再連絡"],
+  ["①相談中","再連絡後も反応なし","2週間以上","クローズ（キャンセル）へ"],
+  ["②調査調整中","日程調整中","3日以内が目安","超過時は理由特定・対応指示"],
+  ["④修繕提案中","提案先・反応なし（漏水継続）","2〜3日に1回","被害状況を伝えて催促"],
+  ["④修繕提案中","提案先・反応なし（漏水止まる）","1週間","進捗確認"],
+  ["④修繕提案中","無回答","1か月","発注意思の再確認"],
+  ["④修繕提案中","無回答（一定条件）","2か月","TJ側でクローズ可"],
+  ["④修繕提案中","日程調整中","1〜2週間以上","理由確認・業者変更も検討"],
+  ["⑧保険審査中","審査結果待ち","1か月以上","保険会社へ進捗確認"],
+  ["⑨精算中","入金遅延30万円超","ー","池田さんへ報告"],
+  ["⑩被害復旧","日程調整中","2週間以上","理由確認・対応策を検討"],
+];
+
+const TRANS_ROWS = [
+  ["①相談中","クローズ（キャンセル）","再連絡から2週間以上反応なし"],
+  ["①相談中","②調査調整中","正式依頼受領"],
+  ["②調査調整中","③調査中","調査日程確定"],
+  ["③調査中","④修繕提案中","調査完了＋報告書送付＋加害側原因修繕提案・被害側被害復旧提案の両方完了"],
+  ["③調査中","⑥方針確認中","調査完了＋報告書送付＋修繕提案不要"],
+  ["④修繕提案中","⑤修繕待ち","工事日確定"],
+  ["④修繕提案中","クローズ","提案後2か月無回答（被害復旧不要で失注クローズ予定・調査費精算済みの場合）"],
+  ["⑧保険審査中","⑨精算中","保険関連手続き完了し入金を待つだけの状態"],
+];
+
+/* ======== RENDER ======== */
+
+function renderSimpleList(items, listEl, idArr){
+  items.forEach(text => {
+    const id = nid(); idArr.push(id);
+    const li = document.createElement('li');
+    const row = document.createElement('div');
+    row.className='ci'; row.dataset.id=id;
+    row.innerHTML=`<span class="box">${CHK}</span><span class="lbl">${text}</span>`;
+    row.addEventListener('click',()=>toggle(id));
+    li.appendChild(row);
+    listEl.appendChild(li);
+  });
+}
+
+function renderItems(items, container, idArr){
+  const ul = document.createElement('ul'); ul.className='cl';
+  items.forEach(item => {
+    const li = document.createElement('li');
+    if(typeof item === 'string'){
+      const id = nid(); idArr.push(id);
+      const row = document.createElement('div');
+      row.className='ci'; row.dataset.id=id;
+      row.innerHTML=`<span class="box">${CHK}</span><span class="lbl">${item}</span>`;
+      row.addEventListener('click',()=>toggle(id));
+      li.appendChild(row);
+    } else if(item.type==='choice'){
+      const id = nid(); idArr.push(id);
+      li.dataset.id=id;
+      const wrap = document.createElement('div'); wrap.className='choice-item';
+      const lbl = document.createElement('div'); lbl.className='choice-label'; lbl.textContent=item.text;
+      const btns = document.createElement('div'); btns.className='choice-btns';
+      item.options.forEach((opt,i)=>{
+        const btn=document.createElement('button'); btn.className='c-btn'; btn.textContent=opt.label; btn.type='button';
+        btn.addEventListener('click',()=>selectChoice(id,i,item.options,idArr));
+        btns.appendChild(btn);
+      });
+      wrap.appendChild(lbl); wrap.appendChild(btns);
+      item.options.forEach((opt,i)=>{
+        const body=document.createElement('div'); body.className='choice-body'; body.dataset.cid=id; body.dataset.idx=i;
+        if(opt.items && opt.items.length>0) renderItems(opt.items,body,idArr);
+        wrap.appendChild(body);
+      });
+      li.appendChild(wrap);
+    } else if(item.type==='yesno'){
+      const id = nid(); idArr.push(id);
+      yesnoData[id]={yes:item.yes,no:item.no};
+      li.dataset.id=id;
+      const wrap=document.createElement('div'); wrap.className='choice-item';
+      const lbl=document.createElement('div'); lbl.className='choice-label'; lbl.textContent=item.text;
+      const btns=document.createElement('div'); btns.className='choice-btns';
+      ['はい','いいえ'].forEach(v=>{
+        const btn=document.createElement('button'); btn.className='c-btn '+(v==='はい'?'yes-btn':'no-btn'); btn.textContent=v; btn.type='button';
+        btn.addEventListener('click',()=>setYN(id,v));
+        btns.appendChild(btn);
+      });
+      const note=document.createElement('div'); note.className='yn-note'; note.dataset.ynid=id;
+      wrap.appendChild(lbl); wrap.appendChild(btns); wrap.appendChild(note);
+      li.appendChild(wrap);
+    }
+    ul.appendChild(li);
+  });
+  container.appendChild(ul);
+}
+
+function selectChoice(id, idx, options, idArr){
+  state[id]=idx;
+  // update buttons
+  const li = document.querySelector(`li[data-id="${id}"]`);
+  if(!li) return;
+  li.querySelectorAll('.c-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+  // show/hide bodies
+  document.querySelectorAll(`.choice-body[data-cid="${id}"]`).forEach(body=>{
+    body.classList.toggle('open', parseInt(body.dataset.idx)===idx);
+  });
+  updateProgress();
+}
+
+function setYN(id, val){
+  state[id]=val;
+  const li=document.querySelector(`li[data-id="${id}"]`);
+  if(!li)return;
+  li.querySelectorAll('.c-btn').forEach(b=>{
+    b.classList.toggle('active',(val==='はい'&&b.classList.contains('yes-btn'))||(val==='いいえ'&&b.classList.contains('no-btn')));
+  });
+  const note=document.querySelector(`.yn-note[data-ynid="${id}"]`);
+  if(note){note.innerHTML=(val==='はい'?yesnoData[id].yes:yesnoData[id].no).replace(/\n/g,'<br>');note.style.display='block';}
+  updateProgress();
+}
+
+function toggle(id){
+  state[id]=!state[id];
+  const el=document.querySelector(`.ci[data-id="${id}"]`);
+  if(el) el.classList.toggle('checked',state[id]);
+  updateProgress();
+}
+
+function updateProgress(){
+  function calc(ids){ return ids.filter(id=>state[id]).length; }
+  function set(doneEl,fillEl,done,total){
+    document.getElementById(doneEl).textContent=done+'/'+total;
+    document.getElementById(fillEl).style.width=(total?done/total*100:0)+'%';
+  }
+  set('p1prog','p1fill',calc(p1Ids),p1Ids.length);
+  set('p2prog','p2fill',calc(p2Ids),p2Ids.length);
+  set('p3prog','p3fill',calc(p3Ids),p3Ids.length);
+  set('p4prog','p4fill',calc(p4Ids),p4Ids.length);
+}
+
+function renderPhase(num){
+  const ph=PHASES[num];
+  p2Ids=[];
+  document.getElementById('phaseName').textContent=ph.title;
+  const body=document.getElementById('phaseBody');
+  body.innerHTML='';
+  renderItems(ph.items,body,p2Ids);
+  if(ph.note){ const n=document.createElement('div'); n.className='note'; n.textContent=ph.note; body.appendChild(n); }
+  updateProgress();
+}
+
+function buildPhaseDefPanel(){
+  const panel=document.getElementById('phaseDefPanel');
+  for(let i=1;i<=11;i++){
+    const ph=PHASES[i];
+    const sec=document.createElement('div'); sec.className='phase-def-section';
+
+    const title=document.createElement('div');
+    title.className='phase-def-title'; title.dataset.phase=i;
+    title.textContent=ph.title;
+
+    const body=document.createElement('div'); body.style.cssText='padding:4px 0 8px 4px;';
+    body.dataset.defbody=i;
+    if(PHASE_DEFS[i]){
+      PHASE_DEFS[i].forEach(def=>{
+        const d=document.createElement('div');
+        d.style.cssText='font-size:12px;color:var(--text);padding:3px 0 3px 8px;border-left:2px solid var(--accent);margin:3px 0;';
+        d.textContent='・'+def; body.appendChild(d);
+      });
+    }
+
+    sec.appendChild(title); sec.appendChild(body);
+    panel.appendChild(sec);
+  }
+}
+
+// フェーズ選択時にサイドパネルの該当フェーズをハイライト
+function highlightDefPhase(num){
+  document.querySelectorAll('.phase-def-title').forEach(t=>{
+    t.classList.toggle('active-phase', parseInt(t.dataset.phase)===num);
+  });
+}
+
+function buildPhaseSelector(){
+  const sel=document.getElementById('phaseSelector');
+  for(let i=1;i<=11;i++){
+    const btn=document.createElement('button'); btn.className='phase-btn'+(i===1?' active':''); btn.textContent=PHASES[i].title; btn.dataset.p=i;
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.phase-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderPhase(i);
+      highlightDefPhase(i);
+    });
+    sel.appendChild(btn);
+  }
+}
+
+function buildTable(el,rows,headers){
+  let h='<tr>'+headers.map(h=>`<th>${h}</th>`).join('')+'</tr>';
+  rows.forEach(r=>{ h+='<tr>'+r.map(c=>`<td>${c}</td>`).join('')+'</tr>'; });
+  document.getElementById(el).innerHTML=h;
+}
+
+/* ======== INIT ======== */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.tab-content[data-tab="${btn.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+document.getElementById('nextCase').addEventListener('click',()=>{
+  state={}; yesnoData={};
+  document.querySelectorAll('.ci.checked').forEach(e=>e.classList.remove('checked'));
+  document.querySelectorAll('.c-btn.active').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.choice-body.open').forEach(e=>e.classList.remove('open'));
+  document.querySelectorAll('.yn-note').forEach(e=>{e.style.display='none';e.textContent='';});
+  updateProgress();
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+buildPhaseSelector();
+buildPhaseDefPanel();
+
+renderSimpleList(P1_ITEMS, document.getElementById('p1list'), p1Ids);
+renderPhase(1);
+highlightDefPhase(1);
+renderSimpleList(P3_ITEMS, document.getElementById('p3list'), p3Ids);
+renderSimpleList(P4_ITEMS, document.getElementById('p4list'), p4Ids);
+
+buildTable('reminderTable', REMINDER_ROWS, ['フェーズ','状況','期間の目安','アクション']);
+buildTable('transTable', TRANS_ROWS, ['現フェーズ','移行先','移行条件']);
+
+updateProgress();
+</script>
+</body>
+</html>
